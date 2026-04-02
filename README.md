@@ -2,21 +2,24 @@
 
 A lightweight Windows desktop calculator for active traders. Given an entry price, stop loss, and dollar risk, Trade Solver computes position size, cost basis, and profit/loss at configurable R-multiple targets. It also supports **Smart Click** — click directly on a price in TradeStation (or any charting platform) and the app reads it via OCR, filling in Entry and Stop automatically.
 
-<img width="276" height="305" alt="solver_sample" src="https://github.com/user-attachments/assets/dbef4c87-1700-44d1-8b73-b8389673acf0" />
+<img width="311" height="496" alt="solver_sample" src="https://github.com/user-attachments/assets/01ef24f3-39d9-421d-847d-12d518bd561c" />
 
 ---
 
 ## Features
 
 - **Position sizing** — Enter any three of Entry, Stop, Risk $, and Shares; the fourth is calculated automatically.
-- **Smart Click (OCR automation)** — Enable the checkbox, click on a price in your charting software, and the app captures the screen region around your click, reads the price with Tesseract OCR, and fills it into the next field (alternating Entry / Stop).
+- **Live re-solve** — After the initial calculation, changing Stop, Shares, or Cost automatically re-derives the other fields using Entry and Risk $ as fixed anchors. No need to clear and re-enter.
+- **Smart Click (OCR automation)** — Enable the checkbox, click on a price in your charting software, and the app captures the screen region around your click, reads the price with Tesseract OCR, and fills it into the next field (alternating Entry / Stop). Clicks inside the calculator window are automatically ignored.
+- **Freeze fields** — Checkbox next to Entry and Stop. When frozen, Smart Click always fills the other field instead of alternating. Useful when you have a fixed entry and want to rapidly test different stop levels (or vice versa).
+- **Platform support** — Toggle between TradeStation (OCR mode) and TradingView (clipboard polling mode) via TS/TV radio buttons.
 - **LFA (Long First Arrival)** — Adaptive OCR delay. Uses a longer capture delay when you first switch back to your charting platform (giving the chart time to render), then a shorter delay for subsequent clicks. Toggled via checkbox.
 - **Configurable profit targets** — Define up to 10 R-multiple targets, each with a custom color. Default: 1R, 2R, 3R (green).
 - **Settings window** — Adjust OCR timing (normal delay, LFA delay), OCR capture region (pixel offsets from click), and profit target definitions without cluttering the main interface.
 - **Dark theme** — Low-distraction dark UI that stays on top of other windows.
 - **Always on top** — The calculator floats above your charting platform.
 - **DPI-aware** — Coordinates stay accurate on scaled displays.
-- **Persistent config** — Window position/size, font size, Risk $ value, and all settings are saved to `window_config.json` and restored on next launch.
+- **Persistent config** — Window position/size, font size, Risk $ value, freeze states, and all settings are saved to `window_config.json` and restored on next launch.
 - **Adjustable font size** — `+` / `-` buttons to scale the UI.
 
 ## Requirements
@@ -38,7 +41,7 @@ pip install pytesseract Pillow pynput
 
 ### Running the standalone .exe
 
-No Python installation or additional dependencies required. Tesseract is bundled inside the executable. Just run `trade_calc_v4.exe`.
+No Python installation or additional dependencies required. Tesseract is bundled inside the executable. Just run `price_calc_III.exe`.
 
 ## Usage
 
@@ -56,6 +59,8 @@ No Python installation or additional dependencies required. Tesseract is bundled
 3. Click on a second price — the app fills **Stop**, auto-detects Long/Short direction, and calculates everything.
 4. Click **Clear** to reset for the next trade setup.
 
+**Freeze mode:** Check the **Freeze** box next to Entry or Stop to lock that field. Smart Click will always fill the unlocked field, skipping the alternation cycle. This is useful when you want to keep your entry fixed and quickly test different stop levels by clicking around the chart.
+
 ### Input scenarios
 
 The calculator flexibly solves for the missing variable:
@@ -66,6 +71,16 @@ The calculator flexibly solves for the missing variable:
 | Entry + Stop + Shares     | Risk $, Cost   |
 | Entry + Shares + Risk $   | Stop, Cost     |
 | Entry + Cost (no Shares)  | Shares         |
+
+### Re-solve behavior
+
+Once all fields are populated, editing any derived field triggers an automatic re-solve with **Entry** and **Risk $** held constant:
+
+| Field changed | Re-derives         |
+|---------------|--------------------|
+| Stop          | Shares, Cost       |
+| Shares        | Stop, Cost         |
+| Cost          | Shares, Stop, Cost |
 
 ### Settings
 
@@ -82,33 +97,26 @@ Settings are saved automatically and persist across sessions.
 ```
 price_calc/
   price_calc_III.py       # Application source (single file)
+  price_calc_III.spec     # PyInstaller build spec
   icon3.ico               # Application icon
   window_config.json      # Auto-generated settings/config (created on first close)
-  trade_calc_v4.spec      # PyInstaller build spec
+  requirements.txt        # Python dependencies
+  venv/                   # Build virtual environment (Python 3.10)
   dist/
-    trade_calc_v4.exe     # Standalone executable
+    price_calc_III.exe    # Standalone executable
 ```
 
 ## Building the .exe
 
-From the `price_calc/` directory with PyInstaller installed:
+Create a venv and build from the `price_calc/` directory:
 
 ```
-pyinstaller --onefile --noconsole --name trade_calc_v4 --icon icon3.ico ^
-  --add-data "C:\Program Files\Tesseract-OCR;Tesseract-OCR" ^
-  --add-binary "C:\python\Library\bin\tcl86t.dll;." ^
-  --add-binary "C:\python\Library\bin\tk86t.dll;." ^
-  --add-binary "C:\python\Library\bin\libmpdec-4.dll;." ^
-  --add-binary "C:\python\Library\bin\liblzma.dll;." ^
-  --add-binary "C:\python\Library\bin\libbz2.dll;." ^
-  --add-binary "C:\python\Library\bin\ffi-8.dll;." ^
-  --add-binary "C:\python\Library\bin\libexpat.dll;." ^
-  --add-data "C:\python\Library\lib\tcl8.6;tcl/tcl8.6" ^
-  --add-data "C:\python\Library\lib\tk8.6;tk/tk8.6" ^
-  price_calc_III.py
+python -m venv venv
+venv\Scripts\pip install pyinstaller pytesseract Pillow pynput
+venv\Scripts\pyinstaller price_calc_III.spec --noconfirm
 ```
 
-Note: The `--add-binary` flags are required when building from a Conda-based Python environment where Tcl/Tk and other DLLs are stored in non-standard locations.
+The spec file (`price_calc_III.spec`) handles bundling Tesseract OCR and the application icon automatically.
 
 ## Limitations
 
@@ -128,4 +136,3 @@ Note: The `--add-binary` flags are required when building from a Conda-based Pyt
 - OCR-based price reading is a convenience feature and is **not guaranteed to be accurate**. Always verify prices visually before acting on them.
 - The authors and contributors of this software accept **no liability** for any trading losses, errors, or damages arising from the use of this tool.
 - **Use at your own risk.** You are solely responsible for your own trading decisions.
-
